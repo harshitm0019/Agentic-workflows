@@ -21,8 +21,11 @@ public class TestFile {
         try {
             riskyOperation();
         } catch (Exception e) {
-            // empty catch block
+            // empty catch block - bad practice
         }
+        
+        // New code to trigger webhook
+        String sql = "SELECT * FROM users WHERE id = " + input; // SQL injection
     }
     
     private static void riskyOperation() throws Exception {
