@@ -1,0 +1,17 @@
+name: pr-review
+trigger: pull_request
+description: Reviews PR code and suggests fixes
+
+steps:
+  - name: review-code
+    agent: code-review
+    input:
+      diff: "{{trigger.diff}}"
+    onError: halt
+
+  - name: suggest-fixes
+    agent: change-suggestion
+    input:
+      findings: "{{steps.review-code.output.findings}}"
+    onError: halt
+    requiresReview: true

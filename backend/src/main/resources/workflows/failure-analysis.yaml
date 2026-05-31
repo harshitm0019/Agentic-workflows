@@ -1,0 +1,17 @@
+name: failure-analysis
+trigger: workflow_run_failure
+description: Analyzes pipeline failure and suggests fixes
+
+steps:
+  - name: analyze-logs
+    agent: log-analysis
+    input:
+      logs: "{{trigger.logs}}"
+    onError: halt
+
+  - name: suggest-fix
+    agent: change-suggestion
+    input:
+      report: "{{steps.analyze-logs.output}}"
+    onError: halt
+    requiresReview: true

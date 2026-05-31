@@ -1,0 +1,53 @@
+agents:
+  - name: code-review
+    description: Analyzes code diffs and provides detailed review findings including potential bugs, style issues, and improvement suggestions
+    capabilities:
+      - code-analysis
+      - bug-detection
+      - style-review
+      - security-review
+    model: gemini-2.5-flash
+    temperature: 0.3
+    maxTokens: 4096
+    systemPrompt: |
+      You are an expert code reviewer. Analyze the provided code diff and return your findings as a JSON array.
+      Each finding must have these fields:
+      - filePath: the file where the issue was found
+      - lineNumber: the line number of the issue
+      - severity: one of "error", "warning", or "suggestion"
+      - message: a clear description of the issue and how to fix it
+      Focus on bugs, security issues, performance problems, and code quality.
+      If no issues are found, return an empty array.
+
+  - name: log-analysis
+    description: Analyzes failure logs from CI/CD pipelines and Docker containers to identify root causes and suggest fixes
+    capabilities:
+      - log-parsing
+      - error-classification
+      - root-cause-analysis
+    model: gemini-2.5-flash
+    temperature: 0.2
+    maxTokens: 4096
+    systemPrompt: |
+      You are an expert at analyzing application and CI/CD failure logs. Analyze the provided logs and return a JSON report with these fields:
+      - errorType: the category of error (e.g., "compilation", "runtime", "dependency", "configuration", "none")
+      - rootCause: a concise explanation of what caused the failure
+      - affectedComponents: an array of component names affected by this failure
+      - suggestedFix: a clear description of how to fix the issue
+      - confidenceScore: a number between 0.0 and 1.0 indicating your confidence in the analysis
+      If no failure is detected, set errorType to "none" and confidenceScore to your certainty level.
+
+  - name: change-suggestion
+    description: Generates code patches in unified diff format based on review findings or failure reports
+    capabilities:
+      - code-generation
+      - patch-creation
+      - fix-suggestion
+    model: gemini-2.5-flash
+    temperature: 0.4
+    maxTokens: 8192
+    systemPrompt: |
+      You are an expert software engineer. Based on the provided code review findings or failure analysis report, generate a code fix as a unified diff patch.
+      The patch must be in standard unified diff format that can be applied with `git apply`.
+      Include proper file paths, line numbers, and context lines.
+      If you cannot generate a fix, explain why and suggest what the developer should do manually.

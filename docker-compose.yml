@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8080:8080"
+    env_file: .env
+    volumes:
+      - ./backend/src/main/resources/workflows:/app/workflows
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  dashboard:
+    build: ./dashboard
+    ports:
+      - "3000:3000"
+    env_file: .env
+    depends_on:
+      backend:
+        condition: service_healthy
