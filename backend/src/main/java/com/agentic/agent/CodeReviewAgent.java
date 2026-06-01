@@ -3,7 +3,8 @@ package com.agentic.agent;
 import com.agentic.config.AgentConfig;
 import com.agentic.dto.AgentInput;
 import com.agentic.dto.AgentOutput;
-import com.agentic.service.GeminiService;
+// NOTE: Switched to LangChain4j. Original: import com.agentic.service.GeminiService;
+import com.agentic.service.LangChainGeminiService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -18,7 +19,7 @@ public class CodeReviewAgent extends BaseAgent {
 
     private final ObjectMapper objectMapper;
 
-    public CodeReviewAgent(String name, AgentConfig config, GeminiService geminiService, ObjectMapper objectMapper) {
+    public CodeReviewAgent(String name, AgentConfig config, LangChainGeminiService geminiService, ObjectMapper objectMapper) {
         super(name, config, geminiService);
         this.objectMapper = objectMapper;
     }

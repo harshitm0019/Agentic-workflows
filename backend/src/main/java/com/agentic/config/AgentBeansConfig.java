@@ -4,7 +4,9 @@ import com.agentic.agent.BaseAgent;
 import com.agentic.agent.ChangeSuggestionAgent;
 import com.agentic.agent.CodeReviewAgent;
 import com.agentic.agent.LogAnalysisAgent;
-import com.agentic.service.GeminiService;
+// NOTE: Switched from raw GeminiService to LangChain4j-based service.
+// Original import was: import com.agentic.service.GeminiService;
+import com.agentic.service.LangChainGeminiService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
@@ -22,7 +24,7 @@ import java.util.Map;
 public class AgentBeansConfig {
 
     @Bean
-    public Map<String, BaseAgent> agents(AgentsConfig agentsConfig, GeminiService geminiService, ObjectMapper objectMapper) {
+    public Map<String, BaseAgent> agents(AgentsConfig agentsConfig, LangChainGeminiService geminiService, ObjectMapper objectMapper) {
         Map<String, BaseAgent> agentMap = new HashMap<>();
 
         for (AgentConfig config : agentsConfig.getValidAgents()) {
@@ -37,7 +39,7 @@ public class AgentBeansConfig {
         return agentMap;
     }
 
-    private BaseAgent createAgent(AgentConfig config, GeminiService geminiService, ObjectMapper objectMapper) {
+    private BaseAgent createAgent(AgentConfig config, LangChainGeminiService geminiService, ObjectMapper objectMapper) {
         return switch (config.name()) {
             case "code-review" -> new CodeReviewAgent(config.name(), config, geminiService, objectMapper);
             case "log-analysis" -> new LogAnalysisAgent(config.name(), config, geminiService, objectMapper);
