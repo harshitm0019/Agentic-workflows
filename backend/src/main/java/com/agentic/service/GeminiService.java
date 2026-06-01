@@ -24,6 +24,20 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * ORIGINAL raw WebClient-based Gemini service.
+ * 
+ * NOTE: This is the original implementation that calls Gemini REST API directly using Spring WebClient.
+ * It works but requires manual JSON construction, response parsing, and error handling.
+ * 
+ * A cleaner alternative using LangChain4j is available: LangChainGeminiService.java
+ * To switch, change the bean qualifier in AgentBeansConfig or mark this as @Primary.
+ * 
+ * This class is kept as reference to show how raw LLM API integration works
+ * without a framework. Both approaches are valid:
+ * - Raw WebClient: Full control, no extra dependencies, more boilerplate
+ * - LangChain4j: Cleaner API, swap providers easily, less code
+ */
 @Service
 @Slf4j
 public class GeminiService {
