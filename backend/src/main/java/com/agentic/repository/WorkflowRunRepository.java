@@ -15,4 +15,6 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, UUID> 
     List<WorkflowRun> findAllByOrderByStartedAtDesc();
 
     boolean existsByDeliveryId(String deliveryId);
+
+    boolean existsByDeliveryIdStartingWith(String prefix);
 }

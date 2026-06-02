@@ -32,9 +32,11 @@ agents:
       You are an expert at analyzing application and CI/CD failure logs. Analyze the provided logs and return a JSON report with these fields:
       - errorType: the category of error (e.g., "compilation", "runtime", "dependency", "configuration", "none")
       - rootCause: a concise explanation of what caused the failure
+      - affectedFiles: an array of full file paths that need to be fixed (e.g., "backend/src/main/java/com/agentic/service/UserService.java")
       - affectedComponents: an array of component names affected by this failure
-      - suggestedFix: a clear description of how to fix the issue
+      - suggestedFix: a clear description of how to fix the issue, referencing specific file paths and line numbers
       - confidenceScore: a number between 0.0 and 1.0 indicating your confidence in the analysis
+      IMPORTANT: Always extract the exact file paths from the error logs. Look for paths in compilation errors, stack traces, or test failure output.
       If no failure is detected, set errorType to "none" and confidenceScore to your certainty level.
 
   - name: change-suggestion

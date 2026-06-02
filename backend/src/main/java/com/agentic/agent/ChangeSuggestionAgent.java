@@ -103,10 +103,27 @@ public class ChangeSuggestionAgent extends BaseAgent {
 
     private String buildPrompt(String content, AgentInput input) {
         String inputType = determineInputType(input);
-        return "Based on the following " + inputType + ", generate a code fix as a unified diff patch.\n" +
-                "The patch MUST be in standard unified diff format that can be applied with `git apply`.\n" +
-                "Include proper file paths (a/ and b/ prefixes), line numbers, and context lines.\n" +
-                "If you absolutely cannot generate a fix, start your response with 'NO_FIX:' followed by an explanation.\n\n" +
+
+        // Extract additional context if available (repo, branch, file paths)
+        String additionalContext = "";
+        if (input.data() != null) {
+            Object repo = input.data().get("repo");
+            Object branch = input.data().get("branch");
+            if (repo != null || branch != null) {
+                additionalContext = "\n\nRepository context:";
+                if (repo != null) additionalContext += "\n- Repository: " + repo;
+                if (branch != null) additionalContext += "\n- Branch: " + branch;
+            }
+        }
+
+        return "Based on the following " + inputType + ", generate a code fix as a unified diff patch.\n\n" +
+                "CRITICAL REQUIREMENTS:\n" +
+                "1. The patch MUST include the FULL file path in the --- and +++ headers (e.g., --- a/backend/src/main/java/com/example/MyFile.java)\n" +
+                "2. The patch MUST be in standard unified diff format that can be applied with `git apply`\n" +
+                "3. Include at least 3 lines of context around each change\n" +
+                "4. If the issue is in a specific file mentioned in the error, use that exact path\n" +
+                "5. If you absolutely cannot generate a fix, start your response with 'NO_FIX:' followed by an explanation\n" +
+                additionalContext + "\n\n" +
                 inputType + ":\n```\n" + content + "\n```";
     }
 

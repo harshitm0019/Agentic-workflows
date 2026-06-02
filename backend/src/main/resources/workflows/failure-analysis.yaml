@@ -13,5 +13,7 @@ steps:
     agent: change-suggestion
     input:
       report: "{{steps.analyze-logs.output}}"
+      repo: "{{trigger.repo}}"
+      branch: "{{trigger.branch}}"
     onError: halt
     requiresReview: true

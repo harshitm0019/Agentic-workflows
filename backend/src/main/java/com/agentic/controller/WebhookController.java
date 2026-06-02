@@ -126,17 +126,31 @@ public class WebhookController {
     private void handleWorkflowRunFailure(JsonNode payload, String deliveryId) {
         String repoFullName = payload.at("/repository/full_name").asText();
         long runId = payload.at("/workflow_run/id").asLong();
+        String headBranch = payload.at("/workflow_run/head_branch").asText("");
+        String workflowName = payload.at("/workflow_run/name").asText("");
 
-        log.info("Processing workflow_run failure for {}/actions/runs/{}", repoFullName, runId);
+        // Deduplicate: only process one failure-analysis per branch per 5-minute window.
+        // Multiple pipelines can fail for the same PR — we only need to analyze once.
+        String dedupeKey = "failure:" + repoFullName + ":" + headBranch;
+        if (workflowRunRepository.existsByDeliveryIdStartingWith(dedupeKey)) {
+            log.info("Already processing failure for branch '{}', skipping workflow '{}'", headBranch, workflowName);
+            return;
+        }
+
+        log.info("Processing workflow_run failure for {}/actions/runs/{} (workflow: {}, branch: {})",
+                repoFullName, runId, workflowName, headBranch);
 
         String logs = githubService.getWorkflowLogs(repoFullName, runId);
         WorkflowDefinition def = workflowLoader.load("failure-analysis");
 
+        // Include the workflow name and branch in trigger payload for context
         Map<String, Object> triggerPayload = Map.of(
                 "logs", logs,
                 "repo", repoFullName,
                 "run_id", runId,
-                "delivery_id", deliveryId
+                "workflow_name", workflowName,
+                "branch", headBranch,
+                "delivery_id", dedupeKey + ":" + deliveryId
         );
 
         engine.executeWorkflow(def, triggerPayload);
