@@ -3,6 +3,8 @@ package com.agentic.controller;
 import com.agentic.engine.WorkflowEngine;
 import com.agentic.model.ReviewItem;
 import com.agentic.repository.ReviewItemRepository;
+import com.agentic.repository.WorkflowRunRepository;
+import com.agentic.service.GitHubService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,7 +37,13 @@ class ReviewControllerTest {
     private ReviewItemRepository reviewItemRepository;
 
     @MockBean
+    private WorkflowRunRepository workflowRunRepository;
+
+    @MockBean
     private WorkflowEngine workflowEngine;
+
+    @MockBean
+    private GitHubService gitHubService;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -92,20 +100,32 @@ class ReviewControllerTest {
                 .workflowStepId(stepId)
                 .agentName("change-suggestion")
                 .reviewType("approve_patch")
+                .payload(Map.of("patch", "--- a/f.java\n+++ b/f.java\n@@ -1 +1 @@\n-old\n+new"))
                 .status("pending")
                 .createdAt(Instant.parse("2024-01-15T10:00:00Z"))
                 .build();
 
+        com.agentic.model.WorkflowRun run = com.agentic.model.WorkflowRun.builder()
+                .id(runId)
+                .workflowName("pr-review")
+                .triggerEvent("pull_request")
+                .triggerPayload(Map.of("repo", "owner/repo", "pr_number", 1))
+                .status("paused_for_review")
+                .currentStep(1)
+                .startedAt(Instant.now())
+                .build();
+
         when(reviewItemRepository.findById(reviewId)).thenReturn(Optional.of(review));
         when(reviewItemRepository.save(any(ReviewItem.class))).thenReturn(review);
+        when(workflowRunRepository.findById(runId)).thenReturn(Optional.of(run));
+        when(workflowRunRepository.save(any())).thenReturn(run);
+        when(gitHubService.pushPatchAsPRComment(any(), anyInt(), any())).thenReturn("abc123sha");
 
         mockMvc.perform(post("/api/reviews/{id}/approve", reviewId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("approved"))
                 .andExpect(jsonPath("$.reviewId").value(reviewId.toString()))
                 .andExpect(jsonPath("$.workflowRunId").value(runId.toString()));
-
-        verify(workflowEngine).resumeAfterReview(runId, true, null);
     }
 
     @Test

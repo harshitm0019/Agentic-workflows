@@ -5,7 +5,7 @@ import com.agentic.dto.AgentInput;
 import com.agentic.dto.AgentOutput;
 import com.agentic.dto.GeminiRequest;
 import com.agentic.dto.GeminiResponse;
-import com.agentic.service.GeminiService;
+import com.agentic.service.LangChainGeminiService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,7 +27,7 @@ import static org.mockito.Mockito.when;
 class LogAnalysisAgentTest {
 
     @Mock
-    private GeminiService geminiService;
+    private LangChainGeminiService geminiService;
 
     private LogAnalysisAgent agent;
     private ObjectMapper objectMapper;

@@ -5,7 +5,7 @@ import com.agentic.dto.AgentInput;
 import com.agentic.dto.AgentOutput;
 import com.agentic.dto.GeminiRequest;
 import com.agentic.dto.GeminiResponse;
-import com.agentic.service.GeminiService;
+import com.agentic.service.LangChainGeminiService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,7 +26,7 @@ import static org.mockito.Mockito.when;
 class ChangeSuggestionAgentTest {
 
     @Mock
-    private GeminiService geminiService;
+    private LangChainGeminiService geminiService;
 
     private ChangeSuggestionAgent agent;
     private ObjectMapper objectMapper;
@@ -54,8 +54,8 @@ class ChangeSuggestionAgentTest {
 
         AgentOutput output = agent.execute(input);
 
-        assertThat(output.success()).isFalse();
-        assertThat(output.error()).contains("No findings or failure report provided");
+        // When no findings provided, agent succeeds with "nothing to fix" (not a failure)
+        assertThat(output.success()).isTrue();
         assertThat(output.requiresReview()).isFalse();
         verify(geminiService, never()).generate(any());
     }
@@ -66,8 +66,9 @@ class ChangeSuggestionAgentTest {
 
         AgentOutput output = agent.execute(input);
 
-        assertThat(output.success()).isFalse();
-        assertThat(output.error()).contains("No findings or failure report provided");
+        // Empty data = no findings = code is clean
+        assertThat(output.success()).isTrue();
+        assertThat(output.requiresReview()).isFalse();
         verify(geminiService, never()).generate(any());
     }
 
@@ -77,8 +78,9 @@ class ChangeSuggestionAgentTest {
 
         AgentOutput output = agent.execute(input);
 
-        assertThat(output.success()).isFalse();
-        assertThat(output.error()).contains("No findings or failure report provided");
+        // Blank findings = no issues to fix
+        assertThat(output.success()).isTrue();
+        assertThat(output.requiresReview()).isFalse();
         verify(geminiService, never()).generate(any());
     }
 
@@ -88,8 +90,9 @@ class ChangeSuggestionAgentTest {
 
         AgentOutput output = agent.execute(input);
 
-        assertThat(output.success()).isFalse();
-        assertThat(output.error()).contains("No findings or failure report provided");
+        // Blank report = no issues to fix
+        assertThat(output.success()).isTrue();
+        assertThat(output.requiresReview()).isFalse();
         verify(geminiService, never()).generate(any());
     }
 
@@ -458,7 +461,15 @@ class ChangeSuggestionAgentTest {
 
     @Test
     void shouldNotSetRequiresReviewOnFailure() {
-        AgentInput input = new AgentInput("change-suggestion", null, null);
+        // Use a case that actually causes failure: Gemini returns NO_FIX
+        String findings = "[{\"filePath\": \"test.java\", \"lineNumber\": 1, \"severity\": \"error\", \"message\": \"Complex issue\"}]";
+        AgentInput input = new AgentInput("change-suggestion", Map.of("findings", findings), null);
+
+        GeminiResponse mockResponse = GeminiResponse.builder()
+                .content("NO_FIX: Cannot fix this automatically")
+                .totalTokens(10)
+                .build();
+        when(geminiService.generate(any(GeminiRequest.class))).thenReturn(mockResponse);
 
         AgentOutput output = agent.execute(input);
 

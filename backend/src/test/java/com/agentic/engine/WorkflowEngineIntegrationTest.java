@@ -10,7 +10,7 @@ import com.agentic.model.WorkflowStepRecord;
 import com.agentic.repository.ReviewItemRepository;
 import com.agentic.repository.WorkflowRunRepository;
 import com.agentic.repository.WorkflowStepRepository;
-import com.agentic.service.GeminiService;
+import com.agentic.service.LangChainGeminiService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

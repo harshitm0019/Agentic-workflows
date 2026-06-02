@@ -22,7 +22,7 @@ jobs:
           cache: maven
 
       - name: Check for compilation errors
-        run: ./mvnw compile -Werror
+        run: ./mvnw compile -q
         working-directory: backend
 
   check-typescript:

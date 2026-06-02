@@ -5,7 +5,7 @@ import com.agentic.dto.AgentInput;
 import com.agentic.dto.AgentOutput;
 import com.agentic.dto.GeminiRequest;
 import com.agentic.dto.GeminiResponse;
-import com.agentic.service.GeminiService;
+import com.agentic.service.LangChainGeminiService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -24,7 +24,7 @@ import static org.mockito.Mockito.when;
 class BaseAgentTest {
 
     @Mock
-    private GeminiService geminiService;
+    private LangChainGeminiService geminiService;
 
     @Test
     void callGeminiShouldUseAgentConfigSettings() {
@@ -84,7 +84,7 @@ class BaseAgentTest {
     // Concrete implementation for testing the abstract class
     private static class TestAgent extends BaseAgent {
 
-        protected TestAgent(String name, AgentConfig config, GeminiService geminiService) {
+        protected TestAgent(String name, AgentConfig config, LangChainGeminiService geminiService) {
             super(name, config, geminiService);
         }
 
