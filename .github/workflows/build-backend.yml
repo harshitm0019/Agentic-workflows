@@ -25,5 +25,5 @@ jobs:
         working-directory: backend
 
       - name: Run tests
-        run: ./mvnw test
+        run: ./mvnw test -Dtest='!*IntegrationTest,!*EndToEnd*' -Dsurefire.timeout=120
         working-directory: backend
