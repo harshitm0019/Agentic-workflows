@@ -10,6 +10,7 @@ spring:
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:h2:mem:agentic;DB_CLOSE_DELAY=-1;MODE=PostgreSQL}
     username: ${SPRING_DATASOURCE_USERNAME:sa}
+import static org.junit.jupiter.api.Assertions.assertThrows;
     password: ${SPRING_DATASOURCE_PASSWORD:}
     driver-class-name: ${SPRING_DATASOURCE_DRIVER:org.h2.Driver}
 
@@ -23,24 +24,33 @@ spring:
 
   flyway:
     enabled: ${FLYWAY_ENABLED:false}
-
+    
   h2:
     console:
-      enabled: true
-      path: /h2-console
+        // Assert that a NullPointerException is thrown when calling a method on a null object
+        assertThrows(NullPointerException.class, () -> {
+            String value = null;
+            value.length();
+        });
 
 management:
-  endpoints:
+++ b/backend/src/test/java/com/agentic/ApplicationStartupTest.java
     web:
-      exposure:
-        include: health,info
+        // Assert that an IndexOutOfBoundsException is thrown when accessing an invalid index
+        assertThrows(IndexOutOfBoundsException.class, () -> {
+            List<String> list = Arrays.asList("one", "two");
+            list.get(5);
+        });
 
 # Application-specific config
 github:
   token: ${GITHUB_TOKEN:}
-  base-url: ${GITHUB_BASE_URL:https://api.github.com}
-  webhook-secret: ${GITHUB_WEBHOOK_SECRET:}
-
+        // Assert that an ArithmeticException is thrown when attempting to divide by zero
+        assertThrows(ArithmeticException.class, () -> {
+            int numerator = 10;
+            int denominator = 0;
+            int result = numerator / denominator;
+        });
 gemini:
   api-key: ${GEMINI_API_KEY:}
   daily-limit: ${GEMINI_DAILY_LIMIT:1500}
