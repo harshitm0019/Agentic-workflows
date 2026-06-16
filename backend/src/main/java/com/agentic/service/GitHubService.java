@@ -86,14 +86,22 @@ public class GitHubService {
         log.info("Fetching workflow logs for {}/actions/runs/{}", repoFullName, runId);
 
         try {
-            // GitHub returns a 302 redirect to a download URL for logs.
-            // We handle the redirect manually because the download URL doesn't need auth headers.
             String downloadUrl = webClient.get()
                     .uri("/repos/" + repoFullName + "/actions/runs/" + runId + "/logs")
                     .exchangeToMono(response -> {
-                        if (response.statusCode().value() == 302) {
+                        int statusCode = response.statusCode().value();
+                        if (statusCode == 302) {
                             String location = response.headers().asHttpHeaders().getFirst("Location");
                             return Mono.justOrEmpty(location);
+                        } else if (statusCode == 401) {
+                            return Mono.error(new GitHubAuthenticationException(
+                                    "GitHub authentication failed for workflow logs: " + repoFullName + "/runs/" + runId));
+                        } else if (statusCode == 403) {
+                            return Mono.error(new GitHubForbiddenException(
+                                    "Access forbidden to workflow logs: " + repoFullName + "/runs/" + runId));
+                        } else if (statusCode == 404) {
+                            return Mono.error(new GitHubNotFoundException(
+                                    "Workflow run not found: " + repoFullName + "/runs/" + runId));
                         } else if (response.statusCode().is2xxSuccessful()) {
                             return response.bodyToMono(byte[].class)
                                     .map(bytes -> "DIRECT:" + Base64.getEncoder().encodeToString(bytes));
@@ -114,7 +122,6 @@ public class GitHubService {
             if (downloadUrl.startsWith("DIRECT:")) {
                 zipBytes = Base64.getDecoder().decode(downloadUrl.substring(7));
             } else {
-                // Download from the redirect URL (no auth header needed)
                 zipBytes = WebClient.create()
                         .get()
                         .uri(downloadUrl)
@@ -126,6 +133,8 @@ public class GitHubService {
             String logs = extractLogsFromZip(zipBytes);
             log.info("Fetched {} chars of logs for run {}", logs.length(), runId);
             return logs;
+        } catch (GitHubAuthenticationException | GitHubForbiddenException | GitHubNotFoundException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Failed to fetch workflow logs for run {}: {}", runId, e.getMessage());
             return "";
