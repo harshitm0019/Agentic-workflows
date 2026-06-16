@@ -128,12 +128,14 @@ public class WebhookController {
         long runId = payload.at("/workflow_run/id").asLong();
         String headBranch = payload.at("/workflow_run/head_branch").asText("");
         String workflowName = payload.at("/workflow_run/name").asText("");
+        String headSha = payload.at("/workflow_run/head_sha").asText("");
 
-        // Deduplicate: only process one failure-analysis per branch per 5-minute window.
-        // Multiple pipelines can fail for the same PR — we only need to analyze once.
-        String dedupeKey = "failure:" + repoFullName + ":" + headBranch;
+        // Deduplicate: only process one failure-analysis per commit per branch.
+        // Multiple pipelines can fail for the same commit — we only need to analyze once.
+        String dedupeKey = "failure:" + repoFullName + ":" + headBranch + ":" + headSha;
         if (workflowRunRepository.existsByDeliveryIdStartingWith(dedupeKey)) {
-            log.info("Already processing failure for branch '{}', skipping workflow '{}'", headBranch, workflowName);
+            log.info("Already processing failure for branch '{}' at commit {}, skipping workflow '{}'",
+                    headBranch, headSha.substring(0, Math.min(7, headSha.length())), workflowName);
             return;
         }
 
