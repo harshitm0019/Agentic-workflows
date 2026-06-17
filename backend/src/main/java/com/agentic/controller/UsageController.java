@@ -38,10 +38,9 @@ public class UsageController {
         LocalDate today = LocalDate.now(ZoneOffset.UTC);
         GeminiUsage usage = geminiUsageRepository.findByDate(today).orElse(null);
 
-        int requestsMade = usage != null ? usage.getRequestCount() : 0;
-        int tokensUsed = usage != null ? usage.getTotalTokens() : 0;
+        int requestsMade = usage.getRequestCount();
+        int tokensUsed = usage.getTotalTokens();
 
-        // Token limit is an estimated value based on free tier (assume ~1M tokens/day for Gemini free tier)
         int tokenLimit = dailyLimit * 1000;
 
         Map<String, Object> response = Map.of(
