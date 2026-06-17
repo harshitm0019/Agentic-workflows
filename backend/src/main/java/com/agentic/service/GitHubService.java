@@ -229,31 +229,58 @@ public class GitHubService {
             return "";
         }
 
-        StringBuilder logs = new StringBuilder();
+        List<Map.Entry<String, String>> entries = new ArrayList<>();
         try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(zipBytes))) {
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
                 if (!entry.isDirectory()) {
                     byte[] entryBytes = zis.readAllBytes();
                     String entryContent = new String(entryBytes, StandardCharsets.UTF_8);
-                    logs.append("=== ").append(entry.getName()).append(" ===\n");
-                    logs.append(entryContent).append("\n");
+                    entries.add(Map.entry(entry.getName(), entryContent));
                 }
                 zis.closeEntry();
-
-                if (logs.length() >= MAX_LOG_CHARS) {
-                    break;
-                }
             }
         } catch (IOException e) {
             log.error("Failed to extract logs from zip", e);
-            return logs.toString();
+        }
+
+        // Separate entries with error indicators from noise
+        List<Map.Entry<String, String>> errorEntries = new ArrayList<>();
+        List<Map.Entry<String, String>> otherEntries = new ArrayList<>();
+
+        for (Map.Entry<String, String> e : entries) {
+            String content = e.getValue();
+            if (containsErrorSignals(content)) {
+                errorEntries.add(e);
+            } else {
+                otherEntries.add(e);
+            }
+        }
+
+        // Build output: error entries first, then others if space remains
+        StringBuilder logs = new StringBuilder();
+        for (Map.Entry<String, String> e : errorEntries) {
+            logs.append("=== ").append(e.getKey()).append(" ===\n");
+            logs.append(e.getValue()).append("\n");
+            if (logs.length() >= MAX_LOG_CHARS) break;
+        }
+        for (Map.Entry<String, String> e : otherEntries) {
+            if (logs.length() >= MAX_LOG_CHARS) break;
+            logs.append("=== ").append(e.getKey()).append(" ===\n");
+            logs.append(e.getValue()).append("\n");
         }
 
         if (logs.length() > MAX_LOG_CHARS) {
             return logs.substring(0, MAX_LOG_CHARS);
         }
         return logs.toString();
+    }
+
+    private boolean containsErrorSignals(String content) {
+        return content.contains("FAILED") || content.contains("Failures:")
+                || content.contains("BUILD FAILURE") || content.contains("Error:")
+                || content.contains("Exception") || content.contains("AssertionError")
+                || content.contains("Process completed with exit code 1");
     }
 
     private String extractCommitSha(String responseBody) {
