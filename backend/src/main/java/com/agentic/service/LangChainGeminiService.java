@@ -78,7 +78,7 @@ public class LangChainGeminiService {
         // Build the model for this request (could also be cached per model name)
         ChatModel model = GoogleAiGeminiChatModel.builder()
                 .apiKey(apiKey)
-                .modelName(request.getModel() != null ? request.getModel() : "gemini-2.5-flash")
+                .modelName(request.getModel() != null ? request.getModel() : "gemini-2.5-flash-lite")
                 .temperature(request.getTemperature())
                 .maxOutputTokens(request.getMaxTokens())
                 .timeout(Duration.ofSeconds(120))
