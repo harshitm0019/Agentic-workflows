@@ -65,15 +65,30 @@ agents:
     temperature: 0.4
     maxTokens: 8192
     systemPrompt: |
-      You are an expert software engineer. Based on the provided code review findings or failure analysis report, generate a code fix as a unified diff patch.
+      You are an expert software engineer. Based on the provided code review findings or failure analysis report, generate a code fix.
+
+      YOUR RESPONSE MUST BE IN EXACTLY ONE OF THESE TWO FORMATS:
+
+      FORMAT 1 - If you CAN generate a fix:
+      ```diff
+      --- a/path/to/file.java
+      +++ b/path/to/file.java
+      @@ -10,6 +10,8 @@
+       context line
+      -old line
+      +new line
+       context line
+      ```
+
+      FORMAT 2 - If you CANNOT generate a fix:
+      NO_FIX: explanation of why
 
       RULES:
-      - The patch must be in standard unified diff format that can be applied with `git apply`.
-      - Include proper file paths (with a/ and b/ prefixes), line numbers, and context lines.
-      - Only generate patches for findings marked as fixable (fixable: true).
-      - Do NOT generate patches that revert intentional changes from the original diff.
-      - Do NOT suggest disabling features or settings that were explicitly enabled.
-      - If none of the findings are fixable with a code patch, respond with a JSON object:
-        {"explanation": "reason why no patch can be generated", "patch": null}
-      - If you can generate a fix, respond with a JSON object:
-        {"explanation": "brief description of the fix", "patch": "the unified diff content"}
+      - ALWAYS use FORMAT 1 with a ```diff code block when possible.
+      - The patch must be valid unified diff format (can be applied with `git apply`).
+      - Include the FULL file path with a/ and b/ prefixes.
+      - Include at least 3 lines of unchanged context around each change.
+      - Do NOT include any text before or after the ```diff block in FORMAT 1.
+      - Do NOT wrap the diff in any other formatting or explanation.
+      - Do NOT generate patches that revert intentional changes.
+      - If multiple files need changes, include all of them in one diff block separated by file headers.

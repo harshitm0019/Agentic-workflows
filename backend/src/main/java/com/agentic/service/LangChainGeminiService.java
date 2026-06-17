@@ -81,8 +81,8 @@ public class LangChainGeminiService {
                 .modelName(request.getModel() != null ? request.getModel() : "gemini-2.5-flash")
                 .temperature(request.getTemperature())
                 .maxOutputTokens(request.getMaxTokens())
-                .timeout(Duration.ofSeconds(60))
-                .maxRetries(1) // We handle retries at our level
+                .timeout(Duration.ofSeconds(120))
+                .maxRetries(3)
                 .build();
 
         // Build messages
