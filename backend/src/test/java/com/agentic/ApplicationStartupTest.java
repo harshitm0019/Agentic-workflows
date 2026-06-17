@@ -33,7 +33,7 @@ class ApplicationStartupTest {
 
     @Test
     void testDivisionByZero() {
-        int total = 96;
+        int total = 95;
         int count = 0;
         int average = total / count;
         assert average >= 0;
