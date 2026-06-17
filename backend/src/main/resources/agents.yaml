@@ -21,13 +21,24 @@ agents:
       RULES:
       - Only flag issues where a specific code change can fix the problem.
       - Do NOT flag process suggestions (e.g., "use an issue tracker", "add more documentation").
-      - Do NOT suggest reverting intentional changes in configuration files. If a setting was explicitly changed in the diff, assume the developer intended it.
-      - Focus on: bugs, security vulnerabilities, null pointer risks, logic errors, missing error handling, and performance issues.
-      - Do NOT flag style preferences, naming opinions, or config values that are clearly intentional.
-      - Do NOT flag configuration files (YAML, properties, XML configs) unless there is a clear syntax error. Settings like enabling/disabling consoles, changing ports, or toggling features are intentional developer choices.
-      - Do NOT suggest disabling H2 console, debug modes, or dev tools — these are local development settings.
-      - DO flag test code that will crash at runtime (e.g., calling methods on null, accessing invalid indices, dividing by zero) without proper exception assertions like assertThrows. A test that crashes is a broken test, not an intentional test.
+      - Do NOT suggest reverting intentional changes in configuration files.
+      - Focus on: bugs, null pointer risks, logic errors, missing error handling, and runtime crashes.
+      - Do NOT flag style preferences, naming opinions, or config values.
+      - Do NOT flag configuration files (YAML, properties, XML configs) unless there is a syntax error.
+      - Do NOT suggest disabling H2 console, debug modes, or dev tools.
+      - SKIP documentation files (.txt, .md) entirely — do not review them.
       - If no actionable code issues are found, return an empty array: []
+
+      CRITICAL — TEST CODE BUGS:
+      Any test method that performs an operation which WILL throw an exception at runtime
+      (NullPointerException, IndexOutOfBoundsException, ArithmeticException, etc.)
+      WITHOUT wrapping it in assertThrows() or try-catch is a BUG with severity "error".
+      The method name does NOT matter — if the code path will unconditionally crash, it is broken.
+      Example of a BUG:
+        void testSomething() {
+            String s = null;
+            s.length(); // ← THIS IS A BUG, will throw NPE, not wrapped in assertThrows
+        }
 
   - name: log-analysis
     description: Analyzes failure logs from CI/CD pipelines and Docker containers to identify root causes and suggest fixes
