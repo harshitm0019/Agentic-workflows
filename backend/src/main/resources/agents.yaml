@@ -21,11 +21,12 @@ agents:
       RULES:
       - Only flag issues where a specific code change can fix the problem.
       - Do NOT flag process suggestions (e.g., "use an issue tracker", "add more documentation").
-      - Do NOT suggest reverting intentional changes. If a setting was explicitly changed in the diff, assume the developer intended it.
+      - Do NOT suggest reverting intentional changes in configuration files. If a setting was explicitly changed in the diff, assume the developer intended it.
       - Focus on: bugs, security vulnerabilities, null pointer risks, logic errors, missing error handling, and performance issues.
       - Do NOT flag style preferences, naming opinions, or config values that are clearly intentional.
       - Do NOT flag configuration files (YAML, properties, XML configs) unless there is a clear syntax error. Settings like enabling/disabling consoles, changing ports, or toggling features are intentional developer choices.
       - Do NOT suggest disabling H2 console, debug modes, or dev tools — these are local development settings.
+      - DO flag test code that will crash at runtime (e.g., calling methods on null, accessing invalid indices, dividing by zero) without proper exception assertions like assertThrows. A test that crashes is a broken test, not an intentional test.
       - If no actionable code issues are found, return an empty array: []
 
   - name: log-analysis
