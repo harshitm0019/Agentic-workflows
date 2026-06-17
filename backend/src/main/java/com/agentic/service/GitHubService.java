@@ -86,14 +86,22 @@ public class GitHubService {
         log.info("Fetching workflow logs for {}/actions/runs/{}", repoFullName, runId);
 
         try {
-            // GitHub returns a 302 redirect to a download URL for logs.
-            // We handle the redirect manually because the download URL doesn't need auth headers.
             String downloadUrl = webClient.get()
                     .uri("/repos/" + repoFullName + "/actions/runs/" + runId + "/logs")
                     .exchangeToMono(response -> {
-                        if (response.statusCode().value() == 302) {
+                        int statusCode = response.statusCode().value();
+                        if (statusCode == 302) {
                             String location = response.headers().asHttpHeaders().getFirst("Location");
                             return Mono.justOrEmpty(location);
+                        } else if (statusCode == 401) {
+                            return Mono.error(new GitHubAuthenticationException(
+                                    "GitHub authentication failed for workflow logs: " + repoFullName + "/runs/" + runId));
+                        } else if (statusCode == 403) {
+                            return Mono.error(new GitHubForbiddenException(
+                                    "Access forbidden to workflow logs: " + repoFullName + "/runs/" + runId));
+                        } else if (statusCode == 404) {
+                            return Mono.error(new GitHubNotFoundException(
+                                    "Workflow run not found: " + repoFullName + "/runs/" + runId));
                         } else if (response.statusCode().is2xxSuccessful()) {
                             return response.bodyToMono(byte[].class)
                                     .map(bytes -> "DIRECT:" + Base64.getEncoder().encodeToString(bytes));
@@ -114,7 +122,6 @@ public class GitHubService {
             if (downloadUrl.startsWith("DIRECT:")) {
                 zipBytes = Base64.getDecoder().decode(downloadUrl.substring(7));
             } else {
-                // Download from the redirect URL (no auth header needed)
                 zipBytes = WebClient.create()
                         .get()
                         .uri(downloadUrl)
@@ -126,6 +133,8 @@ public class GitHubService {
             String logs = extractLogsFromZip(zipBytes);
             log.info("Fetched {} chars of logs for run {}", logs.length(), runId);
             return logs;
+        } catch (GitHubAuthenticationException | GitHubForbiddenException | GitHubNotFoundException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Failed to fetch workflow logs for run {}: {}", runId, e.getMessage());
             return "";
@@ -220,31 +229,58 @@ public class GitHubService {
             return "";
         }
 
-        StringBuilder logs = new StringBuilder();
+        List<Map.Entry<String, String>> entries = new ArrayList<>();
         try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(zipBytes))) {
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
                 if (!entry.isDirectory()) {
                     byte[] entryBytes = zis.readAllBytes();
                     String entryContent = new String(entryBytes, StandardCharsets.UTF_8);
-                    logs.append("=== ").append(entry.getName()).append(" ===\n");
-                    logs.append(entryContent).append("\n");
+                    entries.add(Map.entry(entry.getName(), entryContent));
                 }
                 zis.closeEntry();
-
-                if (logs.length() >= MAX_LOG_CHARS) {
-                    break;
-                }
             }
         } catch (IOException e) {
             log.error("Failed to extract logs from zip", e);
-            return logs.toString();
+        }
+
+        // Separate entries with error indicators from noise
+        List<Map.Entry<String, String>> errorEntries = new ArrayList<>();
+        List<Map.Entry<String, String>> otherEntries = new ArrayList<>();
+
+        for (Map.Entry<String, String> e : entries) {
+            String content = e.getValue();
+            if (containsErrorSignals(content)) {
+                errorEntries.add(e);
+            } else {
+                otherEntries.add(e);
+            }
+        }
+
+        // Build output: error entries first, then others if space remains
+        StringBuilder logs = new StringBuilder();
+        for (Map.Entry<String, String> e : errorEntries) {
+            logs.append("=== ").append(e.getKey()).append(" ===\n");
+            logs.append(e.getValue()).append("\n");
+            if (logs.length() >= MAX_LOG_CHARS) break;
+        }
+        for (Map.Entry<String, String> e : otherEntries) {
+            if (logs.length() >= MAX_LOG_CHARS) break;
+            logs.append("=== ").append(e.getKey()).append(" ===\n");
+            logs.append(e.getValue()).append("\n");
         }
 
         if (logs.length() > MAX_LOG_CHARS) {
             return logs.substring(0, MAX_LOG_CHARS);
         }
         return logs.toString();
+    }
+
+    private boolean containsErrorSignals(String content) {
+        return content.contains("FAILED") || content.contains("Failures:")
+                || content.contains("BUILD FAILURE") || content.contains("Error:")
+                || content.contains("Exception") || content.contains("AssertionError")
+                || content.contains("Process completed with exit code 1");
     }
 
     private String extractCommitSha(String responseBody) {
@@ -270,40 +306,82 @@ public class GitHubService {
     public String pushPatchAsPRComment(String repoFullName, int prNumber, String patch) {
         log.info("Applying patch as commit on {}/pull/{}", repoFullName, prNumber);
 
-        // Get the PR head branch
         String branch = getPRHeadBranch(repoFullName, prNumber);
         if (branch == null) {
             throw new RuntimeException("Could not determine PR head branch for " + repoFullName + "#" + prNumber);
         }
 
-        // Parse the patch to extract file path and the new content
-        // For MVP, we handle the first file in the patch
-        String filePath = extractFilePathFromPatch(patch);
-        if (filePath == null) {
-            // Fallback: post as comment if we can't parse the patch
-            log.warn("Could not parse file path from patch, posting as comment instead");
+        Map<String, String> fileDiffs = splitPatchByFile(patch);
+        if (fileDiffs.isEmpty()) {
+            log.warn("Could not parse any file paths from patch, posting as comment instead");
             return postPatchAsComment(repoFullName, prNumber, patch);
         }
 
-        // Get the current file content from the PR branch
-        String currentContent = getFileContent(repoFullName, filePath, branch);
-        if (currentContent == null) {
-            currentContent = "";
+        String lastCommitSha = null;
+        for (Map.Entry<String, String> entry : fileDiffs.entrySet()) {
+            String filePath = entry.getKey();
+            String fileDiff = entry.getValue();
+
+            String currentContent = getFileContent(repoFullName, filePath, branch);
+            if (currentContent == null) {
+                currentContent = "";
+            }
+
+            String newContent = applyPatch(currentContent, fileDiff);
+            if (newContent == null) {
+                log.warn("Could not apply patch for file {}, posting as comment", filePath);
+                return postPatchAsComment(repoFullName, prNumber, patch);
+            }
+
+            lastCommitSha = pushCommit(repoFullName, branch, filePath, newContent,
+                    "fix: apply suggested changes from Agentic Workflows");
+            log.info("Committed fix to {}/{} on branch {}. SHA: {}", repoFullName, filePath, branch, lastCommitSha);
         }
 
-        // Apply the patch to get new content
-        String newContent = applyPatch(currentContent, patch);
-        if (newContent == null) {
-            // If patch application fails, post as comment
-            log.warn("Could not apply patch programmatically, posting as comment");
-            return postPatchAsComment(repoFullName, prNumber, patch);
+        return lastCommitSha;
+    }
+
+    Map<String, String> splitPatchByFile(String patch) {
+        Map<String, String> fileDiffs = new LinkedHashMap<>();
+        if (patch == null || patch.isBlank()) return fileDiffs;
+
+        String[] lines = patch.split("\n");
+        String currentFile = null;
+        StringBuilder currentDiff = new StringBuilder();
+
+        for (String line : lines) {
+            if (line.startsWith("diff --git") || line.startsWith("+++ b/") || line.startsWith("+++ ")) {
+                if (line.startsWith("+++ b/")) {
+                    if (currentFile != null) {
+                        fileDiffs.put(currentFile, currentDiff.toString());
+                    }
+                    currentFile = line.substring(6).trim();
+                    currentDiff = new StringBuilder();
+                    currentDiff.append(line).append("\n");
+                } else if (line.startsWith("+++ ") && !line.startsWith("+++ /dev/null")) {
+                    if (currentFile != null) {
+                        fileDiffs.put(currentFile, currentDiff.toString());
+                    }
+                    String path = line.substring(4).trim();
+                    if (path.startsWith("b/")) path = path.substring(2);
+                    currentFile = path;
+                    currentDiff = new StringBuilder();
+                    currentDiff.append(line).append("\n");
+                } else {
+                    currentDiff.append(line).append("\n");
+                }
+            } else if (line.startsWith("--- ")) {
+                currentDiff.append(line).append("\n");
+            } else {
+                currentDiff.append(line).append("\n");
+            }
         }
 
-        // Push the new content as a commit
-        String commitSha = pushCommit(repoFullName, branch, filePath, newContent,
-                "fix: apply suggested changes from Agentic Workflows");
-        log.info("Committed fix to {}/{} on branch {}. SHA: {}", repoFullName, filePath, branch, commitSha);
-        return commitSha;
+        if (currentFile != null) {
+            fileDiffs.put(currentFile, currentDiff.toString());
+        }
+
+        return fileDiffs;
     }
 
     /**

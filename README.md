@@ -242,3 +242,8 @@ agentic-workflows/
 ## License
 
 MIT
+
+
+## TODO
+
+- [ ] Replace JPA/JDBC data layer with Supabase REST API (HTTPS on port 443) so the backend works through corporate VPNs that block port 5432. Currently uses H2 in-memory for local dev and direct Postgres for production.

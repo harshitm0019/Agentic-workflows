@@ -179,20 +179,23 @@ public class ChangeSuggestionAgent extends BaseAgent {
             }
         }
 
-        // Try to extract from generic code block
+        // Try to extract from generic code block that contains diff content
         if (trimmed.contains("```")) {
-            int start = trimmed.indexOf("```") + 3;
-            // Skip language identifier on same line
-            int newline = trimmed.indexOf('\n', start);
-            if (newline > start) {
-                start = newline + 1;
-            }
-            int end = trimmed.indexOf("```", start);
-            if (end > start) {
-                String content = trimmed.substring(start, end).trim();
-                if (looksLikeDiff(content)) {
-                    return content;
+            int searchFrom = 0;
+            while (searchFrom < trimmed.length()) {
+                int blockStart = trimmed.indexOf("```", searchFrom);
+                if (blockStart < 0) break;
+                int contentStart = trimmed.indexOf('\n', blockStart);
+                if (contentStart < 0) break;
+                contentStart++;
+                int blockEnd = trimmed.indexOf("```", contentStart);
+                if (blockEnd > contentStart) {
+                    String content = trimmed.substring(contentStart, blockEnd).trim();
+                    if (looksLikeDiff(content)) {
+                        return content;
+                    }
                 }
+                searchFrom = blockEnd > 0 ? blockEnd + 3 : trimmed.length();
             }
         }
 
@@ -204,7 +207,19 @@ public class ChangeSuggestionAgent extends BaseAgent {
         // Try to extract diff portion from mixed response
         int diffStart = findDiffStart(trimmed);
         if (diffStart >= 0) {
-            return trimmed.substring(diffStart).trim();
+            String candidate = trimmed.substring(diffStart).trim();
+            // Try to cut off trailing prose after the diff
+            int lastHunk = candidate.lastIndexOf("\n@@");
+            if (lastHunk >= 0) {
+                // Find end of last hunk content (next empty line or end)
+                int afterHunk = candidate.indexOf("\n\n", lastHunk + 3);
+                if (afterHunk > 0) {
+                    candidate = candidate.substring(0, afterHunk).trim();
+                }
+            }
+            if (!candidate.isBlank()) {
+                return candidate;
+            }
         }
 
         return null;
