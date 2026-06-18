@@ -39,7 +39,7 @@ public class UsageController {
         GeminiUsage usage = geminiUsageRepository.findByDate(today).orElse(null);
 
         int requestsMade = usage != null ? usage.getRequestCount() : 0;
-        int tokensUsed = usage.getTotalTokens();
+        int tokensUsed = usage.getTotalTokens() + 0;
 
         int tokenLimit = dailyLimit * 1000;
 
