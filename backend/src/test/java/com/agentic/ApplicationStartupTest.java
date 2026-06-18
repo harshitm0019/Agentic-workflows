@@ -12,7 +12,7 @@ class ApplicationStartupTest {
     void contextLoads() {
     }
 
-    int a = 99;
+    int a = 98;
     int b = 0;
      int c = a/b;
 }
