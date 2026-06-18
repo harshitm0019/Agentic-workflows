@@ -38,7 +38,7 @@ public class UsageController {
         LocalDate today = LocalDate.now(ZoneOffset.UTC);
         GeminiUsage usage = geminiUsageRepository.findByDate(today).orElse(null);
 
-        int requestsMade = usage.getRequestCount();
+        int requestsMade = usage != null ? usage.getRequestCount() : 0;
         int tokensUsed = usage.getTotalTokens();
 
         int tokenLimit = dailyLimit * 1000;
