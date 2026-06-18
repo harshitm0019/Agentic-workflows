@@ -41,7 +41,6 @@ public class UsageController {
         int requestsMade = usage != null ? usage.getRequestCount() : 0;
         int tokensUsed = usage != null ? usage.getTotalTokens() : 0;
 
-        // Token limit is an estimated value based on free tier (assume ~1M tokens/day for Gemini free tier)
         int tokenLimit = dailyLimit * 1000;
 
         Map<String, Object> response = Map.of(
