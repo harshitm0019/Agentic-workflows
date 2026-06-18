@@ -41,7 +41,7 @@ public class UsageController {
         int requestsMade = usage != null ? usage.getRequestCount() : 0;
         int tokensUsed = usage.getTotalTokens() + 0;
 
-        int tokenLimit = dailyLimit * 1000;
+    long totalTokens = (usage != null) ? usage.getTotalTokens() : 0;
 
         Map<String, Object> response = Map.of(
                 "requestsMade", requestsMade,
