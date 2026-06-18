@@ -104,24 +104,31 @@ public class ChangeSuggestionAgent extends BaseAgent {
     private String buildPrompt(String content, AgentInput input) {
         String inputType = determineInputType(input);
 
-        // Extract additional context if available (repo, branch, file paths)
         String additionalContext = "";
         if (input.data() != null) {
             Object repo = input.data().get("repo");
             Object branch = input.data().get("branch");
+            Object diff = input.data().get("diff");
             if (repo != null || branch != null) {
                 additionalContext = "\n\nRepository context:";
                 if (repo != null) additionalContext += "\n- Repository: " + repo;
                 if (branch != null) additionalContext += "\n- Branch: " + branch;
             }
+            if (diff != null) {
+                String diffStr = diff.toString();
+                if (diffStr.length() > 10000) {
+                    diffStr = diffStr.substring(0, 10000) + "\n... (truncated)";
+                }
+                additionalContext += "\n\nORIGINAL DIFF (use this as source of truth for file paths, line numbers, and context):\n```diff\n" + diffStr + "\n```";
+            }
         }
 
         return "Based on the following " + inputType + ", generate a code fix as a unified diff patch.\n\n" +
                 "CRITICAL REQUIREMENTS:\n" +
-                "1. The patch MUST include the FULL file path in the --- and +++ headers (e.g., --- a/backend/src/main/java/com/example/MyFile.java)\n" +
+                "1. The patch MUST use the EXACT file paths and code from the ORIGINAL DIFF provided below. Do NOT hallucinate or guess code.\n" +
                 "2. The patch MUST be in standard unified diff format that can be applied with `git apply`\n" +
-                "3. Include at least 3 lines of context around each change\n" +
-                "4. If the issue is in a specific file mentioned in the error, use that exact path\n" +
+                "3. Include at least 3 lines of REAL context around each change (copy from the original diff)\n" +
+                "4. Only modify lines that fix the identified issues — keep everything else exactly as shown in the diff\n" +
                 "5. If you absolutely cannot generate a fix, start your response with 'NO_FIX:' followed by an explanation\n" +
                 additionalContext + "\n\n" +
                 inputType + ":\n```\n" + content + "\n```";

@@ -13,5 +13,6 @@ steps:
     agent: change-suggestion
     input:
       findings: "{{steps.review-code.output.findings}}"
+      diff: "{{trigger.diff}}"
     onError: halt
     requiresReview: true

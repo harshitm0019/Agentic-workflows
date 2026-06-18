@@ -452,11 +452,7 @@ public class GitHubService {
      */
     String applyPatch(String currentContent, String patch) {
         try {
-            // Simple strategy: extract the "after" state from the diff
-            // This works for new files or when the patch represents the complete new content
-            StringBuilder newContent = new StringBuilder();
             String[] lines = patch.split("\n");
-            boolean inHunk = false;
 
             // For new files (--- /dev/null), just take all + lines
             boolean isNewFile = false;
@@ -468,6 +464,7 @@ public class GitHubService {
             }
 
             if (isNewFile) {
+                StringBuilder newContent = new StringBuilder();
                 for (String line : lines) {
                     if (line.startsWith("+") && !line.startsWith("+++")) {
                         newContent.append(line.substring(1)).append("\n");
@@ -476,46 +473,61 @@ public class GitHubService {
                 return newContent.toString();
             }
 
-            // For modifications, reconstruct the file:
-            // Keep context lines and + lines, skip - lines
+            // For modifications: parse hunks and apply them sequentially
             String[] currentLines = currentContent.split("\n", -1);
             List<String> result = new ArrayList<>(Arrays.asList(currentLines));
-
-            // Parse hunks and apply changes
-            int currentLineIndex = 0;
             int offset = 0;
 
+            // Parse all hunks
             for (int i = 0; i < lines.length; i++) {
                 String line = lines[i];
-                if (line.startsWith("@@")) {
-                    // Parse hunk header: @@ -startOld,countOld +startNew,countNew @@
-                    String[] parts = line.split(" ");
-                    if (parts.length >= 3) {
-                        String oldRange = parts[1]; // -startOld,countOld
-                        int startOld = Integer.parseInt(oldRange.substring(1).split(",")[0]);
-                        currentLineIndex = startOld - 1 + offset;
-                    }
-                    inHunk = true;
-                    continue;
-                }
+                if (!line.startsWith("@@")) continue;
 
-                if (!inHunk) continue;
+                // Parse hunk header: @@ -startOld,countOld +startNew,countNew @@
+                int startOld = parseHunkStart(line);
+                if (startOld < 0) continue;
 
-                if (line.startsWith("-")) {
-                    // Remove this line
-                    if (currentLineIndex < result.size()) {
-                        result.remove(currentLineIndex);
-                        offset--;
+                int resultIndex = startOld - 1 + offset;
+
+                // Process hunk lines
+                i++;
+                while (i < lines.length && !lines[i].startsWith("@@") && !lines[i].startsWith("diff ")) {
+                    String hunkLine = lines[i];
+                    if (hunkLine.startsWith("-")) {
+                        // Remove: verify the line matches before removing
+                        if (resultIndex < result.size()) {
+                            String expected = hunkLine.substring(1);
+                            String actual = result.get(resultIndex);
+                            if (actual.trim().equals(expected.trim())) {
+                                result.remove(resultIndex);
+                                offset--;
+                            } else {
+                                log.warn("Patch context mismatch at line {}: expected '{}', got '{}'",
+                                        resultIndex + 1, expected.trim(), actual.trim());
+                                return null;
+                            }
+                        }
+                    } else if (hunkLine.startsWith("+")) {
+                        // Add line
+                        result.add(resultIndex, hunkLine.substring(1));
+                        resultIndex++;
+                        offset++;
+                    } else {
+                        // Context line — verify it matches and advance
+                        String contextLine = hunkLine.startsWith(" ") ? hunkLine.substring(1) : hunkLine;
+                        if (resultIndex < result.size()) {
+                            String actual = result.get(resultIndex);
+                            if (!actual.trim().equals(contextLine.trim())) {
+                                log.warn("Patch context mismatch at line {}: expected '{}', got '{}'",
+                                        resultIndex + 1, contextLine.trim(), actual.trim());
+                                return null;
+                            }
+                        }
+                        resultIndex++;
                     }
-                } else if (line.startsWith("+")) {
-                    // Add this line
-                    result.add(currentLineIndex, line.substring(1));
-                    currentLineIndex++;
-                    offset++;
-                } else if (line.startsWith(" ") || line.isEmpty()) {
-                    // Context line, move forward
-                    currentLineIndex++;
+                    i++;
                 }
+                i--; // Back up since the outer loop will increment
             }
 
             return String.join("\n", result);
@@ -523,6 +535,20 @@ public class GitHubService {
             log.error("Failed to apply patch: {}", e.getMessage());
             return null;
         }
+    }
+
+    private int parseHunkStart(String hunkHeader) {
+        try {
+            // @@ -startOld,countOld +startNew,countNew @@
+            String[] parts = hunkHeader.split(" ");
+            if (parts.length >= 3) {
+                String oldRange = parts[1]; // -startOld,countOld
+                return Integer.parseInt(oldRange.substring(1).split(",")[0]);
+            }
+        } catch (NumberFormatException e) {
+            log.warn("Failed to parse hunk header: {}", hunkHeader);
+        }
+        return -1;
     }
 
     /**
